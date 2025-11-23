@@ -45,10 +45,12 @@ def load_model_and_tokenizer(model_name: str, quantize: bool = True):
 
     # Configure quantization for memory efficiency
     if quantize and torch.cuda.is_available():
-        print("Using 8-bit quantization for memory efficiency")
+        print("Using 4-bit quantization for memory efficiency")
         quantization_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            bnb_8bit_compute_dtype=torch.float16,
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
         )
     else:
         quantization_config = None
