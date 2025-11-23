@@ -15,7 +15,7 @@ from pathlib import Path
 from datasets import load_dataset
 from transformers import AutoTokenizer
 from tqdm import tqdm
-
+from typing import Optional
 
 def prepare_c4(
     output_dir: Path,
