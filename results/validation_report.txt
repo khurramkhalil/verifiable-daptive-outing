@@ -10,11 +10,11 @@ SUMMARY
 
 1. FREQUENCY DISTRIBUTION
 ------------------------------------------------------------
-zipf_slope: -1.4178215070744307
-zipf_r_squared: 0.8758186325026855
-zipf_fit_quality: 0.8758186325026855
+zipf_slope: -1.4620483811133898
+zipf_r_squared: 0.8564984917646632
+zipf_fit_quality: 0.8564984917646632
 zipf_pvalue: 0.0
-total_tokens: 5120000
+total_tokens: 10240000
 unique_tokens: 23978
 top_10_coverage: 0.529994140625
 top_100_coverage: 0.6675322265625
@@ -22,45 +22,45 @@ top_1000_coverage: 0.8056779296875
 
 2. FREQUENCY-ENTROPY CORRELATION
 ------------------------------------------------------------
-spearman_correlation: 0.14258567709962075
-spearman_pvalue: 4.1520713452050717e-109
-spearman_significant: True
-pearson_correlation: -0.0014975592265489104
-pearson_pvalue: 0.816629230130149
-spearman_log_correlation: 0.14258567709962075
-spearman_log_pvalue: 4.1520713452050717e-109
+spearman_correlation: nan
+spearman_pvalue: nan
+spearman_significant: False
+pearson_correlation: nan
+pearson_pvalue: nan
+spearman_log_correlation: nan
+spearman_log_pvalue: nan
 correlation_negative: False
 correlation_strong: False
 
 3. ENTROPY DISTRIBUTION
 ------------------------------------------------------------
-mean: 2.072747172933625
-std: 0.01343096604007702
-min: 0.07991452331542996
-max: 2.080078125
-p50: 2.073745576654705
-p95: 2.0769042968750004
-below_0.5: 4.1704896154808576e-05
-below_1.0: 4.1704896154808576e-05
-below_1.5: 4.1704896154808576e-05
+mean: nan
+std: nan
+min: nan
+max: nan
+p50: nan
+p95: nan
+below_0.5: 0.0
+below_1.0: 0.0
+below_1.5: 0.11422971056802068
 
 4. ROUTING CONSISTENCY
 ------------------------------------------------------------
-mean_consistency: 0.643921552764114
-std_consistency: 0.22804283859069552
-high_freq_consistency: 0.45390006803033905
-consistency_freq_correlation: -0.5215168485472367
+mean_consistency: 0.44632925283660824
+std_consistency: 0.11894282068195967
+high_freq_consistency: 0.3937404684661418
+consistency_freq_correlation: -0.33483713498917883
 consistency_freq_pvalue: 0.0
-high_consistency_fraction: 0.2714154641754942
-top_1000_consistency: 0.45390006803033905
+high_consistency_fraction: 0.016723663358078237
+top_1000_consistency: 0.3937404684661418
 
 5. FAST-PATH COVERAGE
 ------------------------------------------------------------
-num_eligible_tokens: 1
-eligible_fraction: 4.1704896154808576e-05
-token_coverage: 0.001953125
-eligible_avg_entropy: 0.07991452331542996
-eligible_avg_consistency: 1.0
-eligible_avg_frequency: 10000.0
+num_eligible_tokens: 0
+eligible_fraction: 0.0
+token_coverage: 0.0
+eligible_avg_entropy: 0
+eligible_avg_consistency: 0
+eligible_avg_frequency: 0
 frequency_threshold: 50
 entropy_threshold: 0.5
