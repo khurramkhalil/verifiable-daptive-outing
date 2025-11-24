@@ -85,7 +85,11 @@ class CacheBuilder(RouterAnalyzer):
                 
                 self.stats[(prev, curr)][top_expert] += 1
                 
-        return {}
+        return {
+            'num_tokens': batch_size * seq_len,
+            'avg_entropy': 0.0,
+            'avg_confidence': 0.0
+        }
 
     def build_cache(self, min_count=5, threshold=0.9):
         """Prune and return the cache."""
