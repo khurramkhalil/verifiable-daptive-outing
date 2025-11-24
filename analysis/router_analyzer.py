@@ -280,7 +280,10 @@ class RouterAnalyzer:
 
         # Limit dataset size if requested
         if max_samples:
-            dataset = dataset.select(range(min(max_samples, len(dataset))))
+            if hasattr(dataset, 'select'):
+                 dataset = dataset.select(range(min(max_samples, len(dataset))))
+            else:
+                 dataset = dataset.take(max_samples)
 
         dataloader = DataLoader(
             dataset,
