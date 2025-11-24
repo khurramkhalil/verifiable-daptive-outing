@@ -489,30 +489,35 @@ class RouterPatcher:
                 # logits: [batch, seq_len, num_experts]
                 # current_input_ids: [batch, seq_len]
                 
-                # Ensure input_ids matches batch/seq dims (basic check)
-                if self.current_input_ids.shape[:2] != logits.shape[:2]:
-                    # Mismatch might happen during generation (kv-cache), skip for now or handle
+                # Check for shape mismatch
+                if self.current_input_ids.shape[:2] == logits.shape[:2]:
+                    # Shapes match directly (e.g. [batch, seq, experts])
+                    target_ids = self.current_input_ids
+                    target_logits = logits
+                elif logits.dim() == 2 and self.current_input_ids.numel() == logits.shape[0]:
+                    # Logits are flattened [batch*seq, experts]
+                    target_ids = self.current_input_ids.view(-1)
+                    target_logits = logits
+                else:
+                    # Genuine mismatch
+                    # print(f"DEBUG: Shape mismatch! Input: {self.current_input_ids.shape}, Logits: {logits.shape}")
                     return logits
 
                 # Create a mask of tokens to force
-                # We do this on CPU for complex dictionary lookups or use tensor operations if table is small
-                # For speed with large tables, we might want a tensor lookup, but for this test, loop is fine
-                # or we can convert routing_table to a lookup tensor if vocabulary is fixed.
-                
-                # Optimization: Only iterate if we have forced tokens in this batch
-                # But for simplicity, let's iterate or use apply
-                
-                # Let's assume routing_table is small (top-k tokens)
-                # We can iterate over the routing table
-                
+                patch_applied = False
                 for token_id, expert_idx in self.routing_table.items():
                     # Find positions of this token
-                    mask = (self.current_input_ids == token_id)
+                    mask = (target_ids == token_id)
                     if mask.any():
                         # Set all logits to -inf
-                        logits[mask] = float('-inf')
+                        target_logits[mask] = float('-inf')
                         # Set target expert to high value
-                        logits[mask, expert_idx] = 10.0 
+                        target_logits[mask, expert_idx] = 10.0 
+                        patch_applied = True
+                
+                if patch_applied:
+                     pass
+                     # print("DEBUG: Patch applied!")
                 
                 return logits
 
