@@ -47,8 +47,9 @@ class CacheBuilder(RouterAnalyzer):
     """Builds the Bigram Cache."""
     def __init__(self, model, tokenizer, **kwargs):
         super().__init__(model, tokenizer, **kwargs)
-        # (prev, curr) -> expert_counts [num_experts]
-        self.stats = defaultdict(lambda: np.zeros(self.num_experts, dtype=np.int32))
+        # (prev, curr) -> expert_pair_counts [expert_pair -> count]
+        # We store expert pairs as tuples (e1, e2) sorted
+        self.stats = defaultdict(lambda: defaultdict(int))
 
     def analyze_batch(self, input_ids, attention_mask=None, layer_to_analyze=0):
         batch_size, seq_len = input_ids.shape
@@ -79,11 +80,14 @@ class CacheBuilder(RouterAnalyzer):
                 curr = input_ids_cpu[b, s]
                 prev = input_ids_cpu[b, s-1]
                 
-                # Top-1 Expert
+                # Top-2 Experts
                 probs = routing_weights_cpu[b, s]
-                top_expert = np.argmax(probs)
+                # Get indices of top 2
+                top_2_indices = np.argsort(probs)[-2:]
+                # Sort them to ensure (e1, e2) is same as (e2, e1) for counting
+                expert_pair = tuple(sorted(top_2_indices))
                 
-                self.stats[(prev, curr)][top_expert] += 1
+                self.stats[(prev, curr)][expert_pair] += 1
                 
         return {
             'num_tokens': batch_size * seq_len,
@@ -97,16 +101,20 @@ class CacheBuilder(RouterAnalyzer):
         total_bigrams = len(self.stats)
         kept_bigrams = 0
         
-        for (prev, curr), counts in self.stats.items():
-            total = counts.sum()
+        for (prev, curr), pair_counts in self.stats.items():
+            total = sum(pair_counts.values())
             if total < min_count:
                 continue
                 
-            top_expert = np.argmax(counts)
-            prob = counts[top_expert] / total
+            # Find most frequent pair
+            top_pair = max(pair_counts.items(), key=lambda x: x[1])
+            pair = top_pair[0]
+            count = top_pair[1]
+            
+            prob = count / total
             
             if prob >= threshold:
-                cache[(prev, curr)] = top_expert
+                cache[(prev, curr)] = pair
                 kept_bigrams += 1
                 
         print(f"Cache built: {kept_bigrams}/{total_bigrams} bigrams kept ({kept_bigrams/total_bigrams*100:.1f}%)")

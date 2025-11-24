@@ -614,16 +614,22 @@ class BigramCachePatcher:
                         prev = ids_cpu[b, s-1]
                         
                         if (prev, curr) in self.cache:
-                            expert_idx = self.cache[(prev, curr)]
+                            experts = self.cache[(prev, curr)]
+                            
+                            # Ensure experts is a list/tuple
+                            if isinstance(experts, int):
+                                experts = [experts]
                             
                             # Flattened index or [b, s] index
                             if target_logits.dim() == 2:
                                 idx = b * seq_len + s
                                 target_logits[idx] = float('-inf')
-                                target_logits[idx, expert_idx] = 10.0
+                                for expert_idx in experts:
+                                    target_logits[idx, expert_idx] = 10.0
                             else:
                                 target_logits[b, s] = float('-inf')
-                                target_logits[b, s, expert_idx] = 10.0
+                                for expert_idx in experts:
+                                    target_logits[b, s, expert_idx] = 10.0
                                 
                             self.hits += 1
                         else:
