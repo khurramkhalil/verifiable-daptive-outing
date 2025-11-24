@@ -537,3 +537,111 @@ class RouterPatcher:
     def set_current_input_ids(self, input_ids):
         """Update the input_ids for the current forward pass."""
         self.current_input_ids = input_ids
+
+class BigramCachePatcher:
+    """
+    Patches MoE model to use a Bigram Cache.
+    If (prev_token, curr_token) is in cache, force to cached expert.
+    Otherwise, use original router.
+    """
+    def __init__(self, model, cache: Dict[Tuple[int, int], int]):
+        """
+        Args:
+            model: The MoE model to patch
+            cache: Dict mapping (prev_token, curr_token) -> expert_idx
+        """
+        self.model = model
+        self.cache = cache
+        self.original_forward_methods = {}
+        self.current_input_ids = None
+        self.modules_to_patch = []
+        
+        # Statistics
+        self.hits = 0
+        self.misses = 0
+
+    def _find_router_modules(self):
+        """Locate all router modules in the model."""
+        modules = []
+        for name, module in self.model.named_modules():
+            if 'block_sparse_moe.gate' in name:
+                modules.append(module)
+        return modules
+
+    def patch(self):
+        """Apply patches to the model."""
+        self.modules_to_patch = self._find_router_modules()
+        # print(f"Patching {len(self.modules_to_patch)} router modules with Bigram Cache...")
+
+        for module in self.modules_to_patch:
+            self.original_forward_methods[module] = module.forward
+
+            def patched_forward(hidden_states, _module=module):
+                # 1. Run original router (we need it for the "miss" case and to get shapes)
+                # In a real optimized system, we wouldn't run it for hits, but here we simulate.
+                logits = self.original_forward_methods[_module](hidden_states)
+                
+                if self.current_input_ids is None:
+                    return logits
+
+                # 2. Check shapes
+                # Handle flattened logits [batch*seq, experts] vs [batch, seq] input
+                if self.current_input_ids.shape[:2] == logits.shape[:2]:
+                    target_ids = self.current_input_ids
+                    target_logits = logits
+                    batch_size, seq_len = target_ids.shape
+                elif logits.dim() == 2 and self.current_input_ids.numel() == logits.shape[0]:
+                    target_ids = self.current_input_ids.view(-1)
+                    target_logits = logits
+                    # Infer batch/seq from input_ids (assuming standard flattening)
+                    batch_size, seq_len = self.current_input_ids.shape
+                else:
+                    return logits
+
+                # 3. Apply Cache
+                # Iterate over batch and sequence
+                # This is slow in Python, but fine for prototype
+                
+                # We need CPU access for dict lookup
+                ids_cpu = self.current_input_ids.cpu().numpy()
+                
+                # We can optimize by only iterating if we have cache entries
+                # But for now, full iteration is safer to prove correctness
+                
+                for b in range(batch_size):
+                    for s in range(1, seq_len): # Start at 1, need prev token
+                        curr = ids_cpu[b, s]
+                        prev = ids_cpu[b, s-1]
+                        
+                        if (prev, curr) in self.cache:
+                            expert_idx = self.cache[(prev, curr)]
+                            
+                            # Flattened index or [b, s] index
+                            if target_logits.dim() == 2:
+                                idx = b * seq_len + s
+                                target_logits[idx] = float('-inf')
+                                target_logits[idx, expert_idx] = 10.0
+                            else:
+                                target_logits[b, s] = float('-inf')
+                                target_logits[b, s, expert_idx] = 10.0
+                                
+                            self.hits += 1
+                        else:
+                            self.misses += 1
+                            
+                return logits
+
+            module.forward = patched_forward
+
+    def unpatch(self):
+        """Restore original forward methods."""
+        for module, original_forward in self.original_forward_methods.items():
+            module.forward = original_forward
+        self.original_forward_methods.clear()
+        
+    def set_current_input_ids(self, input_ids):
+        self.current_input_ids = input_ids
+    
+    def reset_stats(self):
+        self.hits = 0
+        self.misses = 0
