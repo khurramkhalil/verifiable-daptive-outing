@@ -82,7 +82,14 @@ class BigramRouterAnalyzer(RouterAnalyzer):
                     
                     self.bigram_stats[curr_token][prev_token][top_expert] += 1
                     
-        return {} # Return empty stats to satisfy interface
+                    self.bigram_stats[curr_token][prev_token][top_expert] += 1
+                    
+        # Return dummy stats to satisfy interface
+        return {
+            'num_tokens': batch_size * seq_len,
+            'avg_entropy': 0.0,
+            'avg_confidence': 0.0
+        }
 
     def get_bigram_analysis(self):
         """Calculate entropy reduction."""
