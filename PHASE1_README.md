@@ -25,6 +25,7 @@ python experiments/01_routing_analysis.py \
     --dataset c4 \
     --num_samples 10000 \
     --batch_size 4 \
+    --layer 15 \
     --output results/routing_stats.parquet
 
 # 5. Validate hypothesis

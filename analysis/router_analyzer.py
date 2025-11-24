@@ -436,3 +436,96 @@ class RouterAnalyzer:
             'avg_routing_consistency': np.mean(consistencies),
             'checkpoint_manager_active': self.checkpoint_manager is not None,
         }
+
+class RouterPatcher:
+    """
+    Patches MoE model to force specific tokens to specific experts.
+    Used for testing the Indifference Hypothesis.
+    """
+    def __init__(self, model, routing_table: Dict[int, int]):
+        """
+        Args:
+            model: The MoE model to patch
+            routing_table: Dict mapping token_id -> expert_idx to force
+        """
+        self.model = model
+        self.routing_table = routing_table
+        self.original_forward_methods = {}
+        self.current_input_ids = None
+        self.modules_to_patch = []
+
+    def _find_router_modules(self):
+        """Locate all router modules in the model."""
+        modules = []
+        for name, module in self.model.named_modules():
+            # Mixtral
+            if 'block_sparse_moe.gate' in name:
+                modules.append(module)
+            # Switch / Generic (add more heuristics if needed)
+            elif 'router' in name and isinstance(module, nn.Linear):
+                modules.append(module)
+        return modules
+
+    def patch(self):
+        """Apply patches to the model."""
+        self.modules_to_patch = self._find_router_modules()
+        print(f"Patching {len(self.modules_to_patch)} router modules...")
+
+        for module in self.modules_to_patch:
+            # Save original forward
+            self.original_forward_methods[module] = module.forward
+
+            # Define patched forward
+            def patched_forward(hidden_states, _module=module):
+                # Call original to get shape and device correct
+                # (We could optimize this to skip computation, but for now we just override)
+                logits = self.original_forward_methods[_module](hidden_states)
+                
+                if self.current_input_ids is None:
+                    return logits
+
+                # Override logits for forced tokens
+                # hidden_states: [batch, seq_len, dim]
+                # logits: [batch, seq_len, num_experts]
+                # current_input_ids: [batch, seq_len]
+                
+                # Ensure input_ids matches batch/seq dims (basic check)
+                if self.current_input_ids.shape[:2] != logits.shape[:2]:
+                    # Mismatch might happen during generation (kv-cache), skip for now or handle
+                    return logits
+
+                # Create a mask of tokens to force
+                # We do this on CPU for complex dictionary lookups or use tensor operations if table is small
+                # For speed with large tables, we might want a tensor lookup, but for this test, loop is fine
+                # or we can convert routing_table to a lookup tensor if vocabulary is fixed.
+                
+                # Optimization: Only iterate if we have forced tokens in this batch
+                # But for simplicity, let's iterate or use apply
+                
+                # Let's assume routing_table is small (top-k tokens)
+                # We can iterate over the routing table
+                
+                for token_id, expert_idx in self.routing_table.items():
+                    # Find positions of this token
+                    mask = (self.current_input_ids == token_id)
+                    if mask.any():
+                        # Set all logits to -inf
+                        logits[mask] = float('-inf')
+                        # Set target expert to high value
+                        logits[mask, expert_idx] = 10.0 
+                
+                return logits
+
+            # Bind method
+            module.forward = patched_forward
+
+    def unpatch(self):
+        """Restore original forward methods."""
+        for module, original_forward in self.original_forward_methods.items():
+            module.forward = original_forward
+        self.original_forward_methods.clear()
+        print("Restored original router methods.")
+
+    def set_current_input_ids(self, input_ids):
+        """Update the input_ids for the current forward pass."""
+        self.current_input_ids = input_ids
