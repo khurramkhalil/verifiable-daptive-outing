@@ -199,8 +199,14 @@ def main():
     # Use validation split for actual analysis
     val_dataset = load_dataset("allenai/c4", "en", split="validation", streaming=True)
     
+    # Tokenize on the fly
+    def tokenize(examples):
+        return tokenizer(examples['text'], truncation=True, max_length=512)
+        
+    tokenized_dataset = val_dataset.map(tokenize, batched=True, remove_columns=["text", "timestamp", "url"])
+    
     analyzer.analyze_dataset(
-        val_dataset,
+        tokenized_dataset,
         max_samples=args.num_samples,
         batch_size=4,
         layer_to_analyze=0 # Index 0 of [args.layer]
